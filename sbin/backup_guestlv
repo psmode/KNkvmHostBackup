@@ -1,0 +1,104 @@
+#!/bin/sh
+#
+#
+set -o errexit
+umask -S o-rwx
+
+SOURCE_MP=$(realpath $1)
+HOST_VG=$2
+HOST_LV=$3
+GUEST_VG=$4
+GUEST_LV=$5
+TARGET_MP=$(realpath $6)
+TARGET2_MP=$7
+SUBSET_DIR=$(echo $8 | sed 's\^/*\\'  |  sed 's\/*$\\')                 #drops any leading and trailing / characters
+
+SOURCE_MP_BASENAME=$(basename $SOURCE_MP)
+TARGET_DIR="$TARGET_MP/$SOURCE_MP_BASENAME/"
+if [ -z "$TARGET2_MP" ]
+then
+	EXCLUDE_PATH=""
+	exclq=""
+else
+	TARGET2_MP=$(realpath $TARGET2_MP)
+	EXCLUDE_PATH="$SOURCE_MP_BASENAME/$SUBSET_DIR/"
+	exclq="--exclude=$EXCLUDE_PATH"
+	TARGET2_DIR="$(dirname $TARGET2_MP/$SOURCE_MP_BASENAME/$SUBSET_DIR)"
+	SOURCE_MP_EXCLUDED="$SOURCE_MP/$SUBSET_DIR"
+fi
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Check for $TARGET_MP mounted"
+echo "***"
+	if [ ! -d "$TARGET_DIR" ]; then
+           echo "$TARGET_MP not available -- aborting on error"
+           exit 1
+	else
+	   /usr/sbin/xfs_growfs -n $TARGET_MP
+	   echo ""
+           df $TARGET_MP
+	fi
+#
+if [ ! -z "$TARGET2_MP" ]
+then
+        if [ ! -d "$TARGET2_DIR" ]; then
+           echo "$TARGET2_DIR not available -- aborting on error"
+           exit 1
+        else
+           /usr/sbin/xfs_growfs -n $TARGET2_MP
+           echo ""
+           df $TARGET2_MP
+        fi
+fi
+
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Prepare and mount snapshot of Guest VM $GUEST_VG/$GUEST_LV filesystem on $SOURCE_MP"
+echo "***"
+	/usr/local/sbin/guestlvmnt m $SOURCE_MP $HOST_VG $HOST_LV $GUEST_VG $GUEST_LV
+	if [ $? -ne 0 ]
+	then
+	    echo "ERROR MOUNTING GUEST FILESYSTEM -- aborting on error"
+	    exit 1
+	fi
+
+
+if [ ! -z "$TARGET2_MP" ]
+then
+    echo "***"
+    echo "***"
+    echo "*** `date +%x\ %T`: rsync snapshot source path $SOURCE_MP_EXCLUDED to $TARGET2_DIR"
+    echo "***"
+	echo "rsync -aAXh --delete --stats $SOURCE_MP_EXCLUDED $TARGET2_DIR"
+	rsync -aAXh --delete --stats $SOURCE_MP_EXCLUDED $TARGET2_DIR || true
+fi
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: rsync snapshot mounted on $SOURCE_MP to $TARGET_DIR $exclq"
+echo "***"
+	echo "rsync -aAXh --delete --stats $SOURCE_MP $TARGET_MP $exclq"
+	rsync -aAXh --delete --stats $SOURCE_MP exclq $TARGET_MP $exclq || true
+
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Dismount snapshot of Guest VM $GUEST_VG/$GUEST_LV filesystem on $SOURCE_MP"
+echo "***"
+	/usr/local/sbin/guestlvmnt u $SOURCE_MP $HOST_VG $HOST_LV $GUEST_VG $GUEST_LV
+#
+        echo ""
+	du $TARGET_DIR
+if [ ! -z "TARGET2_MP" ]
+then
+        echo ""
+	du $TARGET2_DIR
+fi
+
+echo "****"
+echo "****"
+echo "**** `date +%x\ %T`: JOB COMPLETE"
+echo "****"
+echo "****"

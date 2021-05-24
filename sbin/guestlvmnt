@@ -1,0 +1,127 @@
+#!/bin/sh
+#
+#
+OPCODE=$1
+EXPORT_MP=$2
+HOST_VG=$3
+HOST_LV=$4
+GUEST_VG=$5
+GUEST_LV=$6
+#
+#
+#lvs $HOST_VG/$HOST_LV
+#echo ""
+#echo ""
+
+#
+# Validate HOST_VG and HOST_LV parameters and check for GUEST_VG and GUEST_LV parameters
+#
+if [ ! -b "/dev/$HOST_VG/$HOST_LV" ]
+then
+	echo "** HOST VG AND/OR LV BAD OR MISSING - parameter required - aborting on error"
+	exit 1
+fi
+if [ -z "$GUEST_VG" ] | [ -z "$GUEST_LV" ]
+then
+	echo "** GUEST VG AND/OR LV MISSING - parameters required - aborting on error"
+	exit 1
+fi
+
+
+
+if [ "$OPCODE" == "m" ]
+then
+   echo "**"
+   echo "**"
+   echo "** `date +%x\ %T`: Mounting guest filesystem $GUEST_VG/$GUEST_LV on $EXPORT_MP"
+   echo "**"
+	if [ -z "$EXPORT_MP" ]
+	then
+	   echo "** MOUNT PATH MISSING - parameter required for mount operation - aborting on error"
+	   exit 1
+	fi
+	if [ ! -d "$EXPORT_MP/" ]
+	then
+	   echo "** MOUNT PATH $EXPORT_MP DOES NOT EXIST - aborting on error"
+	   exit 1
+	fi
+
+	echo ""
+	echo "*** `date +%x\ %T`: Snap the host LV used by the guest ($HOST_VG/$HOST_LV)"
+	/sbin/lvcreate --extents 5%ORIGIN --snapshot --name bu-$HOST_LV /dev/$HOST_VG/$HOST_LV
+
+	echo ""
+	echo "*** `date +%x\ %T`: Create guest-level device map on host from snapshot LV (/dev/$HOST_VG/bu-$HOST_LV)"
+	/sbin/kpartx -avs /dev/$HOST_VG/bu-$HOST_LV
+	sleep 5
+
+
+	echo ""
+	echo "** `date +%x\ %T`: Check for existence of guest-level VG/LV before continuing"
+	if [ ! -d "/dev/$GUEST_VG" ]
+	then
+	   echo "** COULD NOT FIND GUEST VG - $GUEST_VG missing - Unwind not possible, aborting on error"
+	   echo
+	   /sbin/vgs
+	   exit 2
+	elif [ ! -b "/dev/$GUEST_VG/$GUEST_LV" ]
+	then
+	   echo "** COULD NOT FILE GUEST VG/LV - $GUEST_VG/$GUEST_LV not found - unwinding then aborting on error"
+	   /sbin/vgchange --activate n --verbose $GUEST_VG
+	   /sbin/kpartx -dv /dev/$HOST_VG/bu-$HOST_LV
+	   /sbin/lvremove --force /dev/$HOST_VG/bu-$HOST_LV
+	   echo
+	   /sbin/vgs
+	   exit 1
+	fi
+
+	echo ""
+	echo "** `date +%x\ %T`: Activate guest-level volume group exposed to host ($GUEST_VG)"
+	/sbin/vgchange --activate y --activationmode=complete --verbose $GUEST_VG
+
+	echo ""
+	echo  "** `date +%x\ %T`: Mount guest-level LV as read-only filesystem (/dev/$GUEST_VG/$GUEST_LV on $EXPORT_MP)"
+	mount --read-only /dev/$GUEST_VG/$GUEST_LV $EXPORT_MP
+	df $EXPORT_MP
+
+	
+elif [ "$OPCODE" == "u" ]
+then
+   echo "**"
+   echo "**"
+   echo "** `date +%x\ %T`: Unmounting filesystem $GUEST_VG/$GUEST_LV from $EXPORT_MP"
+   echo "**"
+	echo ""
+	echo "** `date +%x\ %T`: Unmount guest-level LV ($EXPORT_MP)"
+	df /dev/$GUEST_VG/$GUEST_LV
+	if [ $? -eq 0 ]
+	then
+	   umount /dev/$GUEST_VG/$GUEST_LV
+	else
+	   echo "** VOLUME NOT MOUNTED - aborting on error"
+	   exit 1
+	fi
+
+	echo ""
+	echo "** `date +%x\ %T`: De-activate guest-level volume group exposed to host ($GUEST_VG)"
+	/sbin/vgchange --activate n --verbose $GUEST_VG
+
+	echo ""
+	echo "*** `date +%x\ %T`: Remove guest-level device map on host from snapshot LV (/dev/$HOST_VG/bu-$HOST_LV)"
+	/sbin/kpartx -dv /dev/$HOST_VG/bu-$HOST_LV
+
+	echo ""
+	echo "*** `date +%x\ %T`: Remove the snap the host LV used by the guest ($HOST_VG/$HOST_LV)"
+	/sbin/lvremove --force /dev/$HOST_VG/bu-$HOST_LV
+
+	echo ""
+	/sbin/vgs
+
+
+else
+	echo "** BAD OPERATION SPECIFIED /$OPCODE/- must be one of m or u (mount/unmount) - aborting on error"
+	exit 1
+fi
+
+exit 0
+

@@ -1,0 +1,19 @@
+#!/bin/sh
+#
+#
+declare -A VOLMAP=()
+VOLMAP[WD40EFRX-68N32N0]="1"
+VOLMAP[WD4003FFBX-68MU3N0]="2"
+MP_BASE="/mnt/mysite-pbd"
+
+TARGET_DEV=$1
+KEYFILE=$2
+
+DeviceModel=`smartctl --info $TARGET_DEV | grep "Device Model" | awk -- '($1 == "Device") { print $NF }'`
+
+if [ ${VOLMAP[$DeviceModel]+_} ]; then
+	/usr/local/sbin/vcmount $MP_BASE ${TARGET_DEV}1 ${VOLMAP[$DeviceModel]} $KEYFILE
+else
+	echo "$TARGET_DEV is not a supported device -- aborting on error"
+	exit 1
+fi

@@ -1,0 +1,45 @@
+#!/bin/sh
+#
+#
+MP_BASE=$1
+VOLNUM=$2
+
+#
+# Check that volume is currently mounted and sync if it is
+#
+TARGET_MP=$MP_BASE$VOLNUM
+findmnt $TARGET_MP > /dev/null
+if [[ $? -ne 0 ]]; then
+        echo "Mountpoint $TARGET_MP not online"
+	exit 1
+else
+	df --sync -h $TARGET_MP
+fi
+
+
+#
+# Find the underlying physical partition for mountpoint in Veracrypt
+#
+CRYPT_PART="$(cut -d' ' -f2 <<<"$(veracrypt --list $TARGET_MP)")"
+#
+# If CRYPT_PART is /dev/sdf23
+# then CRYPT_PART_NUM is 23
+#  and CRYPTR_DEV = /dev/sdf
+#
+CRYPT_PART_NUM=${CRYPT_PART##*[[:alpha:]]}
+CRYPT_DEV=${CRYPT_PART:0:$((${#CRYPT_PART}-${#CRYPT_PART_NUM}))}
+
+#
+# Dismount the Veracrypt volume
+#
+echo ""
+echo "Dismounting Veracrypt volume on partition $CRYPT_PART..."
+
+
+if [ "$CRYPT_PART" != "" ]
+then
+	veracrypt --verbose -d $CRYPT_PART
+else
+	echo "** $MP_BASE volume not found **"
+	exit 2
+fi 

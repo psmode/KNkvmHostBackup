@@ -1,0 +1,52 @@
+#!/bin/sh
+#
+#
+TARGET_MP=$1
+SOURCE_HN=$2
+#
+umask -S o-rwx
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Find $TARGET_MP/cold_snaps"
+echo "***"
+if [ ! -d "$TARGET_MP/cold_snaps/" ]; then
+        echo "$TARGET_MP volume not mounted -- aborting on error"
+        exit 1
+else
+        /usr/sbin/xfs_growfs -n $TARGET_MP
+fi
+
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Check for target hostname argument and source cold snap procedure"
+echo "***"
+if [ "$SOURCE_HN" == "" ]
+then
+	echo "** Error: Target hostname not specified as argument - exiting on error **"
+	exit 2
+else
+	source /usr/local/sbin/cold_snap.sh $SOURCE_HN
+fi
+
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Backup snapshot LVs for host on VM $UV ($TARGET)"
+echo "***"
+	/sbin/lvs --units=m  --noheadings --nosuffix | awk -- "/bu-$UV-.*/ {s = sprintf(\"dd if=/dev/%s/%s of=$TARGET_MP/cold_snaps/%s--%s.dd ibs=128k obs=128k\", \$2, \$1, \$2, \$1); print; print s; system(s)}"
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Remove snapshot LVs for host on VM $UV ($TARGET)"
+echo "***"
+	/sbin/lvs --units=m  --noheadings --nosuffix | awk -- "/bu-$UV-.*/ {s = sprintf(\"/sbin/lvremove --verbose --force /dev/%s/%s\", \$2, \$1); print; print s; system(s)}"
+	echo ""
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Final state for LVs for host on VM $UV ($TARGET)"
+echo "***"
+        /sbin/lvs | grep "LSize\|$UV-"
+	echo ""

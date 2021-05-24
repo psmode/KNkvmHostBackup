@@ -1,0 +1,14 @@
+#!/bin/sh
+#
+#
+SOURCE_MP=/mnt/nas_bkup
+HOST_VG=T3b
+HOST_LV=uv069-disk3
+GUEST_VG=V3buv069
+GUEST_LV=backups
+TARGET_MP=/mnt/mysite-pbd2
+TARGET2_MP=/mnt/mysite-pbd1
+SUBSET_DIR=Win/foo
+
+
+/usr/local/sbin/backup_guestlv $SOURCE_MP $HOST_VG $HOST_LV $GUEST_VG $GUEST_LV $TARGET_MP $TARGET2_MP $SUBSET_DIR

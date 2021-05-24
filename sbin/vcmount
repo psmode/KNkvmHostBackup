@@ -1,0 +1,51 @@
+#!/bin/sh
+#
+FSOPT="--fs-options=nobarrier,async"
+#
+# If CRYPT_PART is /dev/sdf23
+# then CRYPT_PART_NUM is 23
+#  and CRYPTR_DEV = /dev/sdf
+#
+MP_BASE=$1
+CRYPT_PART=$2
+VOLNUM=$3
+KEYFILE=${4:-"$(realpath ~/truecrypt.keyfile)"}
+
+CRYPT_PART_NUM=${CRYPT_PART##*[[:alpha:]]}
+CRYPT_DEV=${CRYPT_PART:0:$((${#CRYPT_PART}-${#CRYPT_PART_NUM}))}
+
+#
+# Verify presence of mountpoint
+#
+TARGET_MP=$MP_BASE$VOLNUM
+if [ ! -d "$TARGET_MP/" ]; then
+        echo "$TARGET_MP mountpoint does not exist -- aborting on error"
+        exit 1
+else
+	if [ ! -z "$(ls -A $TARGET_MP)" ]; then
+		echo "$TARGET_MP directory is not empty -- aborting on error"
+		exit 1
+	fi
+fi
+
+#
+# Dump partition information
+#
+parted $CRYPT_DEV print
+
+#
+# Use Veracrypt to mount the partition
+#
+echo "CRYPT_PART=$CRYPT_PART"
+echo "veracrypt -k=$KEYFILE -p=\"\" --pim=0 --protect-hidden=no --verbose  $FSOPT $CRYPT_PART $MP_BASE$VOLNUM"
+
+veracrypt -k=$KEYFILE --stdin --non-interactive --pim=0 --protect-hidden=no --verbose $FSOPT $CRYPT_PART $MP_BASE$VOLNUM
+
+#
+# Show mountpoint/filesystem information
+#
+xfs_info $MP_BASE$VOLNUM
+echo
+df -h $MP_BASE$VOLNUM
+echo
+ls -al $MP_BASE$VOLNUM/

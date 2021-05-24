@@ -1,0 +1,74 @@
+#!/bin/sh
+#
+#
+# usage:	/usr/local/sbin/KVMbackup /mnt/mysite-pbd1 
+# or:		/usr/local/sbin/KVMbackup /mnt/mysite-pbd1 kvmfarm1 "lv-not-this lv-nor-this" "/local_repo"
+#
+echo "$1 ~ $2 ~ $3  ~ $4"
+TARGET_MP=$1
+HOST_BDIR=${2:-"${HOSTNAME%%.*}"}
+FILTER_LV=$3
+EXCLUDE_PATHS=$4
+#
+HOST_BCK_PATH=$TARGET_MP/$HOST_BDIR
+GUEST_BCK_PATH=$TARGET_MP/$HOST_BDIR-lvm
+GUEST_BCK_SCRIPT=$(realpath ~/lvmddgz.sh)
+umask -S o-rwx
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Remove prior KVM guest backups with: rm $BACKUP_PATH/*.dd*"
+echo "***"
+if [ ! -d "$GUEST_BCK_PATH/" ]; then
+	echo "$TARGET_MP volume not mounted or $GUEST_BCK_PATH not found -- aborting on error"
+	exit 1
+else
+	/usr/sbin/xfs_growfs -n $TARGET_MP
+	echo
+###	ls -al $GUEST_BCK_PATH/*.dd*
+	rm --force --verbose $GUEST_BCK_PATH/*.dd*
+fi
+
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Build lvmddgz.sh for KVM guest backups"
+echo "***"
+/sbin/lvs --units=m  --noheadings --nosuffix \
+	| awk -f /usr/local/bin/lvm-vm-filter.awk -v filterlv="$FILTER_LV" \
+	| sort --reverse \
+	| awk -f /usr/local/sbin/make_guest_bck_script.awk -v ExtTarget="$GUEST_BCK_PATH" \
+		> $GUEST_BCK_SCRIPT
+chmod +x $GUEST_BCK_SCRIPT
+echo
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Execute KVM host backup with: rsync -aAXh /*"
+echo "***"
+ExcludePaths=/dev/*,/proc/*,/sys/*,/tmp/*,/run/*,/mnt/*,/media/*,/lost+found
+if [ ! -z "$EXCLUDE_PATHS" ] 
+then
+	ExcludePaths="${ExcludePaths},$EXCLUDE_PATHS"
+fi
+exclq=$( excl=$ExcludePaths ; eval echo --exclude={$excl} )
+echo "rsync -aAXh --delete --stats /* $HOST_BCK_PATH $exclq"
+###rsync -aAXh --dry-run --delete --stats /* $HOST_BCK_PATH $exclq
+rsync -aAXh --delete --stats /* $HOST_BCK_PATH $exclq
+
+echo "***"
+echo "***"
+echo "*** `date +%x\ %T`: Execute KVM guest backups with launch of $GUEST_BCK_SCRIPT"
+echo "***"
+###cat $GUEST_BCK_SCRIPT
+nice -n 19 $GUEST_BCK_SCRIPT
+
+
+echo "****"
+echo "****"
+echo "**** `date +%x\ %T`: JOB COMPLETE"
+echo "****"
+echo "****"
+ls -al $GUEST_BCK_PATH/
+echo
+/usr/sbin/xfs_growfs -n $TARGET_MP

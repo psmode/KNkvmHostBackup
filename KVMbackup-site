@@ -1,0 +1,9 @@
+#!/bin/sh
+#
+#
+TARGET_MP="/mnt/mysite-pbd1"
+FILTER_LV="uv047-disk4 uv052-disk0 uv052-clone0"
+EXCLUDE_PATHS="/repo/*,/var/lib/libvirt/qemu/save/*,/var/www/html/CentOS*/*"
+
+
+/usr/local/sbin/KVMbackup $TARGET_MP "" "$FILTER_LV" $EXCLUDE_PATHS

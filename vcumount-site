@@ -1,0 +1,8 @@
+#!/bin/sh
+#
+#
+MP_BASE="/mnt/mysite-pbd"
+
+VOLNUM=$1
+
+/usr/local/sbin/vcumount $MP_BASE $VOLNUM

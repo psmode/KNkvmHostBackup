@@ -14,6 +14,13 @@ HOST_BCK_PATH=$TARGET_MP/$HOST_BDIR
 GUEST_BCK_PATH=$TARGET_MP/$HOST_BDIR-lvm
 GUEST_BCK_SCRIPT=$(realpath ~/lvmddgz.sh)
 umask -S o-rwx
+#
+if [ -x "$(command -v pigz)" ]; then
+        echo "Multithreaded gzip enabled"
+        ZIP_CMD="pigz --processes 10"
+else
+        ZIP_CMD=""
+fi
 
 echo "***"
 echo "***"
@@ -37,7 +44,7 @@ echo "***"
 /sbin/lvs --units=m  --noheadings --nosuffix \
 	| awk -f /usr/local/bin/lvm-vm-filter.awk -v filterlv="$FILTER_LV" \
 	| sort --reverse \
-	| awk -f /usr/local/sbin/make_guest_bck_script.awk -v ExtTarget="$GUEST_BCK_PATH" \
+	| awk -f /usr/local/sbin/make_guest_bck_script.awk -v ExtTarget="$GUEST_BCK_PATH" -v ZipCmd="$ZIP_CMD" \
 		> $GUEST_BCK_SCRIPT
 chmod +x $GUEST_BCK_SCRIPT
 echo

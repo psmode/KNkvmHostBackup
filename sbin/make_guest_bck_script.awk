@@ -1,6 +1,8 @@
 BEGIN {
 	if (substr(ExtTarget, length(ExtTarget),1) != "/")
 	   ExtTarget = ExtTarget "/";
+	if (ZipCmd == "")
+	   ZipCmd = "gzip --fast"
 	sLastGuest = "";
 	iLvIndex = 0;
 	iBiggie = 50000;
@@ -47,8 +49,8 @@ function NewGuest()
 	   printf("echo \"* `date +%%x\\ %%T`: dd if=/dev/%s/bu-%s\"\n",
 		aLV_vg[i], aLV_name[i]);
 	   if (aLV_size[i] > iBiggie)
-	      printf("dd if=/dev/%s/bu-%s ibs=64k obs=64k | gzip --fast > %sbu-%s.dd.gz\n",
-		aLV_vg[i], aLV_name[i], ExtTarget, aLV_name[i])
+	      printf("dd if=/dev/%s/bu-%s ibs=64k obs=64k | %s > %sbu-%s.dd.gz\n",
+		aLV_vg[i], aLV_name[i], ZipCmd, ExtTarget, aLV_name[i])
 	   else
               printf("dd if=/dev/%s/bu-%s ibs=64k obs=64k of=%sbu-%s.dd\n",
                 aLV_vg[i], aLV_name[i], ExtTarget, aLV_name[i]);

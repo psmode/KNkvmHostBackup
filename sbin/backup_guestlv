@@ -80,7 +80,7 @@ echo "***"
 echo "*** `date +%x\ %T`: rsync snapshot mounted on $SOURCE_MP to $TARGET_DIR $exclq"
 echo "***"
 	echo "rsync -aAXh --delete --stats $SOURCE_MP $TARGET_MP $exclq"
-	rsync -aAXh --delete --stats $SOURCE_MP exclq $TARGET_MP $exclq || true
+	rsync -aAXh --delete --stats $SOURCE_MP $TARGET_MP $exclq || true
 
 
 echo "***"
@@ -91,7 +91,7 @@ echo "***"
 #
         echo ""
 	du $TARGET_DIR
-if [ ! -z "TARGET2_MP" ]
+if [ ! -z "$TARGET2_MP" ]
 then
         echo ""
 	du $TARGET2_DIR

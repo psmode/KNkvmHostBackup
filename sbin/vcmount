@@ -1,6 +1,7 @@
-#!/bin/sh
+#!/usr/bin/sh
 #
-FSOPT="--fs-options=nobarrier,async"
+#FSOPT="--fs-options=nobarrier,async"
+FSOPT=""
 #
 # If CRYPT_PART is /dev/sdf23
 # then CRYPT_PART_NUM is 23

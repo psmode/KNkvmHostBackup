@@ -7,6 +7,8 @@ HOST_VG=$3
 HOST_LV=$4
 GUEST_VG=$5
 GUEST_LV=$6
+
+DEV_MAP="$HOST_VG-bu--${HOST_LV/-/--}p1"
 #
 #
 #lvs $HOST_VG/$HOST_LV
@@ -53,8 +55,31 @@ then
 	echo ""
 	echo "*** `date +%x\ %T`: Create guest-level device map on host from snapshot LV (/dev/$HOST_VG/bu-$HOST_LV)"
 	/sbin/kpartx -avs /dev/$HOST_VG/bu-$HOST_LV
-	sleep 5
+	sleep 15
 
+#	echo ""
+#	echo "*** `date +%x\ %T`: Check for existence of guest-level device map before continuing"
+#	if [ ! -d "/dev/mapper/$DEV_MAP" ]
+#	then
+#	   echo "** COULD NOT FIND GUEST DEVICE MAP - /dev/mapper/$DEV_MAP missing - Unwind not possible, aborting on error"
+#	   echo
+#	   /sbin/vgs
+#           exit 2
+#	fi
+
+	echo ""
+	echo "*** `date +%x\ %T`: Add $DEV_MAP to those that LVM will reference"
+	/sbin/lvmdevices
+	/sbin/lvmdevices --adddev /dev/mapper/$DEV_MAP
+	/sbin/lvmdevices
+
+	echo ""
+	echo "*** `date +%x\ %T`: Scan for guest volume group $GUEST_VG"
+	/sbin/vgscan --devices /dev/mapper/$DEV_MAP
+
+	echo ""
+	echo "** `date +%x\ %T`: Activate guest-level volume group exposed to host ($GUEST_VG)"
+	/sbin/vgchange --activate y --activationmode=complete --verbose $GUEST_VG
 
 	echo ""
 	echo "** `date +%x\ %T`: Check for existence of guest-level VG/LV before continuing"
@@ -68,16 +93,13 @@ then
 	then
 	   echo "** COULD NOT FILE GUEST VG/LV - $GUEST_VG/$GUEST_LV not found - unwinding then aborting on error"
 	   /sbin/vgchange --activate n --verbose $GUEST_VG
+	   /sbin/lvmdevices --deldev /dev/mapper/$DEV_MAP
 	   /sbin/kpartx -dv /dev/$HOST_VG/bu-$HOST_LV
 	   /sbin/lvremove --force /dev/$HOST_VG/bu-$HOST_LV
 	   echo
 	   /sbin/vgs
 	   exit 1
 	fi
-
-	echo ""
-	echo "** `date +%x\ %T`: Activate guest-level volume group exposed to host ($GUEST_VG)"
-	/sbin/vgchange --activate y --activationmode=complete --verbose $GUEST_VG
 
 	echo ""
 	echo  "** `date +%x\ %T`: Mount guest-level LV as read-only filesystem (/dev/$GUEST_VG/$GUEST_LV on $EXPORT_MP)"
@@ -105,6 +127,11 @@ then
 	echo ""
 	echo "** `date +%x\ %T`: De-activate guest-level volume group exposed to host ($GUEST_VG)"
 	/sbin/vgchange --activate n --verbose $GUEST_VG
+
+	echo ""
+	echo "*** `date +%x\ %T`: Delete $DEV_MAP from those that LVM will reference"
+	/sbin/lvmdevices --deldev /dev/mapper/$DEV_MAP
+	/sbin/lvmdevices
 
 	echo ""
 	echo "*** `date +%x\ %T`: Remove guest-level device map on host from snapshot LV (/dev/$HOST_VG/bu-$HOST_LV)"
